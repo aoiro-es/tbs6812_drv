@@ -41,6 +41,7 @@
 #define TBSECP3_VID		0x544d
 #define TBSECP3_PID		0x6178
 
+#ifdef TBS_DVB_EXTENSION
 #define TBSECP3_BOARD_TBS6205 	0
 #define TBSECP3_BOARD_TBS6281SE	1
 #define TBSECP3_BOARD_TBS6290SE	2
@@ -92,6 +93,10 @@
 #define TBSECP3_BOARD_TBS6312X	48
 #define TBSECP3_BOARD_TBS6324	49
 #define TBSECP3_BOARD_TBS6322	50
+#define TBSECP3_BOARD_TBS6812	51
+#else
+#define TBSECP3_BOARD_TBS6812	0
+#endif
 
 
 #define TBSECP3_MAX_ADAPTERS	(16)
@@ -122,6 +127,7 @@ struct tbsecp3_gpio_config {
 struct tbsecp3_adap_config {
         u32 ts_in;
 	u8 i2c_bus_nr;
+	bool tlv_dma;
 	struct tbsecp3_gpio_config gpio;
 };
 

@@ -18,6 +18,7 @@
 #include "tbsecp3.h"
 
 struct tbsecp3_board tbsecp3_boards[] = {
+#ifdef TBS_DVB_EXTENSION
 	[TBSECP3_BOARD_TBS6916] = {
 		.board_id	= TBSECP3_BOARD_TBS6916,
 		.name		= "TurboSight TBS 6916 (Octa DVB-S/S2/S2X)",
@@ -1815,5 +1816,31 @@ struct tbsecp3_board tbsecp3_boards[] = {
 			},
 
 		}
+	},
+#endif
+	[TBSECP3_BOARD_TBS6812] = {
+		.board_id	= TBSECP3_BOARD_TBS6812,
+		.name  		= "Turbosight TBS 6812 (Dual ISDB-T/S/S3)",
+		.i2c_speed	= 10,
+		.adapters	= 2,
+		.eeprom_i2c	= 0,
+		.eeprom_addr	= 0xa0,
+		.adap_config ={
+			
+			{
+				.ts_in = 0,
+				.i2c_bus_nr = 0,
+				.tlv_dma = true,
+				.gpio.lnb_power.lvl	= TBSECP3_GPIODEF_LOW,
+				.gpio.lnb_power.nr	= TBSECP3_GPIO_PIN(0, 2),
+				.gpio.lnb_voltage.lvl	= TBSECP3_GPIODEF_HIGH,
+				.gpio.lnb_voltage.nr	= TBSECP3_GPIO_PIN(0, 1),
+			}, 
+			{
+				.ts_in = 1,
+				.i2c_bus_nr = 1,
+				.tlv_dma = true,
+			},
+		},
 	},
 };

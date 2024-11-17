@@ -17,6 +17,7 @@
 
 #include "tbsecp3.h"
 
+#ifdef TBS_DVB_EXTENSION
 #include "tas2101.h"
 #include "av201x.h"
 
@@ -42,7 +43,8 @@
 #include "m88rs6060.h"
 #include "gx1133.h"
 #include "cxd2878.h"
-
+#endif
+#include "cxd2857.h"
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
@@ -578,6 +580,7 @@ static void reset_demod(struct tbsecp3_adapter *adapter)
 }
 
 
+#ifdef TBS_DVB_EXTENSION
 static struct tas2101_config tbs6902_demod_cfg[] = {
 	{
 		.i2c_address   = 0x60,
@@ -1385,6 +1388,26 @@ static struct cxd2878_config tbs6590se_cfg[] = {
 		.rf_port = 1,
 		}		
 	};
+#endif
+
+static struct cxd2857_config tbs6812_cfg[] = {
+		{
+		.addr_slvt	= 0x64,
+		.xtal		= SONY_DEMOD_XTAL_24000KHz,
+		.tuner_addr	= 0x60,
+		.tuner_xtal	= SONY_ASCOT3_XTAL_24000KHz,
+		.tuner_index	= 1,
+		.tlv_mode	= 1,
+		},
+		{
+		.addr_slvt	= 0x64,
+		.xtal		= SONY_DEMOD_XTAL_24000KHz,
+		.tuner_addr	= 0x61,
+		.tuner_xtal	= SONY_ASCOT3_XTAL_24000KHz,
+		.tuner_index	= 2,
+		.tlv_mode	= 1,
+		}
+	};
 static void tbs_octuples_reset_demod(struct tbsecp3_adapter *adapter)
 {
 	struct tbsecp3_dev *dev = adapter->dev;
@@ -1447,6 +1470,7 @@ static int tbsecp3_frontend_attach(struct tbsecp3_adapter *adapter)
 	struct tbsecp3_dev *dev = adapter->dev;
 	struct pci_dev *pci = dev->pci_dev;
 
+#ifdef TBS_DVB_EXTENSION
 	struct si2168_config si2168_config;
 	struct si2183_config si2183_config;
 	struct si2157_config si2157_config;
@@ -1455,6 +1479,7 @@ static int tbsecp3_frontend_attach(struct tbsecp3_adapter *adapter)
 	struct mtv23x_config mtv23x_config;
 	struct gx1503_config gx1503_config;
 	struct m88rs6060_cfg m88rs6060_config;
+#endif
 	struct i2c_board_info info;
 	struct i2c_adapter *i2c = &adapter->i2c->i2c_adap;
 	struct i2c_client *client_demod, *client_tuner;
@@ -1464,12 +1489,22 @@ static int tbsecp3_frontend_attach(struct tbsecp3_adapter *adapter)
 	adapter->i2c_client_demod = NULL;
 	adapter->i2c_client_tuner = NULL;
 
-	if((TBSECP3_BOARD_TBS6304 != dev->info->board_id) && (TBSECP3_BOARD_TBS6308 != dev->info->board_id) && (TBSECP3_BOARD_TBS6302SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6209SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6909SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6504H!= dev->info->board_id)){
+#ifdef TBS_DVB_EXTENSION
+	if((TBSECP3_BOARD_TBS6304 != dev->info->board_id) && (TBSECP3_BOARD_TBS6308 != dev->info->board_id) && (TBSECP3_BOARD_TBS6302SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6209SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6909SE != dev->info->board_id)&&(TBSECP3_BOARD_TBS6504H!= dev->info->board_id)&&(TBSECP3_BOARD_TBS6812!= dev->info->board_id)){
 		reset_demod(adapter);
 		set_mac_address(adapter);
 	}
+#endif
 
 	switch (dev->info->board_id) {
+	   case TBSECP3_BOARD_TBS6812:
+	   	tbs_octuples_reset_demod(adapter);
+	   	set_mac_address(adapter);
+		adapter->fe = cxd2857_attach(&tbs6812_cfg[adapter->nr], i2c);
+		if (adapter->fe == NULL)
+		     goto frontend_atach_fail;
+		break;
+#ifdef TBS_DVB_EXTENSION
 	   case TBSECP3_BOARD_TBS6590SE:   
 	   	tbs6590se_reset_demod(adapter);
 	   //	adapter->fe2 = &adapter->_fe2;
@@ -2552,6 +2587,7 @@ static int tbsecp3_frontend_attach(struct tbsecp3_adapter *adapter)
 			tbsecp3_ca_init(adapter, adapter->nr);
 		
 		break;
+#endif
 
 	default:
 		dev_warn(&dev->pci_dev->dev, "unknonw card\n");
@@ -2712,7 +2748,9 @@ void tbsecp3_dvb_exit(struct tbsecp3_adapter *adapter)
     struct dvb_demux *dvbdemux = &adapter->demux;
 
     if (adapter->fe) {
+#ifdef TBS_DVB_EXTENSION
         tbsecp3_ca_release(adapter);
+#endif
         dvb_unregister_frontend(adapter->fe);
         tbsecp3_release_sec(adapter->fe);
         dvb_frontend_detach(adapter->fe);

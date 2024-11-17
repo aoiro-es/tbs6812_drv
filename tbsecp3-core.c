@@ -310,6 +310,7 @@ static int tbsecp3_resume(struct pci_dev *pdev)
 	.driver_data = (unsigned long)&tbsecp3_boards[_board_id] }
 
 static const struct pci_device_id tbsecp3_id_table[] = {
+#ifdef TBS_DVB_EXTENSION
 	TBSECP3_ID(TBSECP3_BOARD_TBS6205,0x6205,0x0001),
 	TBSECP3_ID(TBSECP3_BOARD_TBS6281SE,0x6281,0x0002),
 	TBSECP3_ID(TBSECP3_BOARD_TBS6290SE,0x6290,0x0002),
@@ -372,13 +373,19 @@ static const struct pci_device_id tbsecp3_id_table[] = {
 	TBSECP3_ID(TBSECP3_BOARD_TBS6590SE,0x6590,0x0002),
 	TBSECP3_ID(TBSECP3_BOARD_TBS6916,0x6916,0x0001),
 	TBSECP3_ID(TBSECP3_BOARD_TBS6324,0x6324,0x0010),
-	TBSECP3_ID(TBSECP3_BOARD_TBS6322,0x6322,0x0010),				
+	TBSECP3_ID(TBSECP3_BOARD_TBS6322,0x6322,0x0010),
+#endif				
+	TBSECP3_ID(TBSECP3_BOARD_TBS6812,0x6812,0x0001),				
 	{0}
 };
 MODULE_DEVICE_TABLE(pci, tbsecp3_id_table);
 
 static struct pci_driver tbsecp3_driver = {
+#ifdef TBS_DVB_EXTENSION
 	.name = "TBSECP3 driver",
+#else
+	.name = "TBS6812 driver",
+#endif
 	.id_table = tbsecp3_id_table,
 	.probe    = tbsecp3_probe,
 	.remove   = tbsecp3_remove,
@@ -389,5 +396,9 @@ static struct pci_driver tbsecp3_driver = {
 module_pci_driver(tbsecp3_driver);
 
 MODULE_AUTHOR("Luis Alves <ljalvs@gmail.com>");
+#ifdef TBS_DVB_EXTENSION
 MODULE_DESCRIPTION("TBS ECP3 driver");
+#else
+MODULE_DESCRIPTION("TBS6812 driver");
+#endif
 MODULE_LICENSE("GPL");

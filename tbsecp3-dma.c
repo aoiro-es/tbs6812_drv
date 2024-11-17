@@ -47,7 +47,7 @@ static void tbsecp3_dma_tasklet(unsigned long adap)
 		{
 			data = adapter->dma.buf[read_buffer];
 
-			if (data[adapter->dma.offset] != 0x47) {
+			if (!adapter->cfg->tlv_dma && data[adapter->dma.offset] != 0x47) {
 			/* Find sync byte offset with crude force (this might fail!) */
 				for (i = 0; i < TS_PACKET_SIZE; i++)
 					if ((data[i] == 0x47) &&
@@ -67,7 +67,10 @@ static void tbsecp3_dma_tasklet(unsigned long adap)
 						adapter->dma.buf[0], adapter->dma.offset);
 				}
 			}
-			dvb_dmx_swfilter_packets(&adapter->demux, data, adapter->dma.buffer_pkts);
+			if (adapter->cfg->tlv_dma)
+				dvb_dmx_swfilter_raw(&adapter->demux, data, adapter->dma.buffer_size);
+			else
+				dvb_dmx_swfilter_packets(&adapter->demux, data, adapter->dma.buffer_pkts);
 			read_buffer = (read_buffer + 1) & (TBSECP3_DMA_BUFFERS - 1);
 		}
 	}
@@ -110,6 +113,8 @@ void tbsecp3_dma_reg_init(struct tbsecp3_dev *dev)
 
 	for (i = 0; i < dev->info->adapters; i++) {
 		tbs_write(adapter->dma.base, TBSECP3_DMA_EN, 0);
+		if (adapter->cfg->tlv_dma)
+			tbs_write(adapter->dma.base, TBSECP3_DMA_TLV_UNK, 0);
 		tbs_write(adapter->dma.base, TBSECP3_DMA_ADDRH, 0);
 		tbs_write(adapter->dma.base, TBSECP3_DMA_ADDRL, (u32) adapter->dma.dma_addr);
 		tbs_write(adapter->dma.base, TBSECP3_DMA_TSIZE, adapter->dma.page_size);
