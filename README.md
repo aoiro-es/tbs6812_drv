@@ -5,13 +5,14 @@ ISDB-T/ISDB-S/ISDB-S3対応Linux向けTBS6812 a.k.a. PT4Kドライバ
 カーネルモジュールのビルド環境を構築後、次のようにしてビルド (例):
 
 ```sh
-make -C "/lib/modules/$(uname -r)/build" "M=$(pwd)" tbs6812.ko
+make -C "/lib/modules/$(uname -r)/build" "M=$(pwd)" tbs6812.ko cxd2857.ko
 ```
 
 ロード:
 
 ```sh
 modprobe dvb-core
+insmod ./cxd2857.ko
 insmod ./tbs6812.ko
 ```
 

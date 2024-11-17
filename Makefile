@@ -1,3 +1,4 @@
-tbs6812-objs	:= tbsecp3-core.o tbsecp3-cards.o tbsecp3-i2c.o tbsecp3-dma.o tbsecp3-dvb.o tbsecp3-asi.o cxd2857.o
+tbs6812-objs	:= tbsecp3-core.o tbsecp3-cards.o tbsecp3-i2c.o tbsecp3-dma.o tbsecp3-dvb.o tbsecp3-asi.o
+cxd2857-objs	:= cxd2857er.o
 # tbsecp3-ca.o
-obj-m	:= tbs6812.o
+obj-m	:= tbs6812.o cxd2857.o

@@ -2629,3 +2629,9 @@ err:
 	dev_err(&i2c->dev, "%s:error attaching frontend.\n", KBUILD_MODNAME);
 	return NULL;
 }
+
+EXPORT_SYMBOL_GPL(cxd2857_attach);
+
+MODULE_AUTHOR("Davin zhang <Davin@tbsdtv.com>, otya <otya281@gmail.com>");
+MODULE_DESCRIPTION("SONY CXD2857 Demodulator + CXD2868 Tuner driver");
+MODULE_LICENSE("GPL");

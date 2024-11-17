@@ -1500,7 +1500,7 @@ static int tbsecp3_frontend_attach(struct tbsecp3_adapter *adapter)
 	   case TBSECP3_BOARD_TBS6812:
 	   	tbs_octuples_reset_demod(adapter);
 	   	set_mac_address(adapter);
-		adapter->fe = cxd2857_attach(&tbs6812_cfg[adapter->nr], i2c);
+		adapter->fe = dvb_attach(cxd2857_attach, &tbs6812_cfg[adapter->nr], i2c);
 		if (adapter->fe == NULL)
 		     goto frontend_atach_fail;
 		break;
