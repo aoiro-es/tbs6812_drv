@@ -1080,6 +1080,7 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 	int ret;
 	u8 serialTS;
 	u8 tsRateCtrlOff = 0;
+	u8 tsInOff = 0;
 
 	struct sony_demod_ts_clk_configuration_t tsClkConfiguration;
 
@@ -1130,17 +1131,17 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 	if (ret)
 		goto err;
 	if ((dev->system == SONY_DTV_SYSTEM_ISDBT) ||
-	    (dev->system == SONY_DTV_SYSTEM_ISDBC) ||
-	    (dev->system == SONY_DTV_SYSTEM_ATSC)) // isdbs or isdbs3
+	    (dev->system == SONY_DTV_SYSTEM_ISDBS) ||
+	    (dev->system == SONY_DTV_SYSTEM_ISDBS3))
 		tsRateCtrlOff = 1;
+	if (dev->system == SONY_DTV_SYSTEM_ISDBS3)
+		tsInOff = 1;
 
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0xD3, tsRateCtrlOff, 0x01);
-	cxd2878_SetRegisterBits(dev, dev->slvt, 0xDE, 0x00,
-				0x01); // isdbs3 => 0x01
+	cxd2878_SetRegisterBits(dev, dev->slvt, 0xDE, tsInOff, 0x01);
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0xDA, 0x00, 0x01);
 	if (serialTS & 0x80) {
 		/* Serial TS */
-		/* Intentional fall through */
 		tsClkConfiguration = serialTSClkSettings[1][1];
 	} else {
 		/* Parallel TS */
