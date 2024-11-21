@@ -1432,8 +1432,10 @@ err:
 		KBUILD_MODNAME);
 	return ret;
 }
-static int cxd2878_sleep(struct cxd2878_dev *dev)
+static int cxd2878_sleep(struct dvb_frontend *fe)
 {
+	struct cxd2878_dev *dev = fe->demodulator_priv;
+
 	if (dev->state == SONY_DEMOD_STATE_ACTIVE) {
 		cxd2878_setstreamoutput(dev, 0);
 		cxd2878_wr(dev, dev->slvt, 0x00, 0x00);
@@ -1822,7 +1824,7 @@ static int cxd2878_set_isdbt(struct dvb_frontend *fe)
 	} else if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 		   (dev->system != SONY_DTV_SYSTEM_ISDBT)) {
 		/* Demodulator Active but not ISDB-T mode */
-		cxd2878_sleep(dev);
+		cxd2878_sleep(fe);
 		dev->system = SONY_DTV_SYSTEM_ISDBT;
 		SLtoAIT(dev);
 
@@ -1879,7 +1881,7 @@ static int cxd2878_set_isdbs(struct dvb_frontend *fe)
 	} else if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 		   (dev->system != SONY_DTV_SYSTEM_ISDBS)) {
 		/* Demodulator Active but not ISDB-S mode */
-		cxd2878_sleep(dev);
+		cxd2878_sleep(fe);
 		cxd2878_set_tsid(fe, c->stream_id);
 		dev->system = SONY_DTV_SYSTEM_ISDBS;
 		SLtoAIS(dev);
@@ -1937,7 +1939,7 @@ static int cxd2878_set_isdbs3(struct dvb_frontend *fe)
 	} else if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 		   (dev->system != SONY_DTV_SYSTEM_ISDBS3)) {
 		/* Demodulator Active but not ISDB-S3 mode */
-		cxd2878_sleep(dev);
+		cxd2878_sleep(fe);
 		cxd2878_set_stream_id(fe, c->stream_id);
 		dev->system = SONY_DTV_SYSTEM_ISDBS3;
 		SLtoAIS3(dev);
@@ -2502,6 +2504,7 @@ static const struct dvb_frontend_ops cxd2878_ops = {
 	},
 
 			.init 				= cxd2878_init,
+			.sleep				= cxd2878_sleep,
 			.release			= cxd2878_release,
 			.set_frontend			= cxd2878_set_frontend,
 			.tune				= cxd2878_tune,
