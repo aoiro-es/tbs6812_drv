@@ -750,6 +750,7 @@ static int cxd2857_tune(struct cxd2878_dev *dev, u32 frequencykHz)
 	    tuner_state == SONY_TUNER_STATE_S) {
 		u8 data[] = { 0x15, 0x00, 0x00 };
 		cxd2878_wr(dev, dev->tuner_addr, 0x74, 0x02);
+		cxd2878_SetRegisterBits(dev, dev->tuner_addr, 0x67, 0x00, 0xfe);
 		cxd2878_wrm(dev, dev->tuner_addr, 0x5e, data, 3);
 		cxd2878_wr(dev, dev->tuner_addr, 0x88, 0x00);
 		cxd2878_wr(dev, dev->tuner_addr, 0x87, 0xc0);
@@ -941,9 +942,6 @@ static int cxd2857_init(struct cxd2878_dev *dev)
 	cxd2878_wrm(dev, dev->tuner_addr, 0x5E, &dataT[0], 3);
 
 	cxd2878_wr(dev, dev->tuner_addr, 0x0c, 0x14);
-
-	u8 tmp[3] = { 0x9e, 0x00, 0x00 };
-	cxd2878_wrm(dev, dev->tuner_addr, 0x79, &tmp[0], 3);
 	cxd2878_wr(dev, dev->tuner_addr, 0x0d, 0x00);
 
 	u8 cdata[2] = { 0x7a, 0x01 };
@@ -1031,9 +1029,9 @@ static int cxd2878_setstreamoutput(struct cxd2878_dev *dev, int enable)
 	int ret;
 	u8 data = 0;
 	/* slave    Bank    Addr    Bit    default    Name
-     * ---------------------------------------------------
-     * <SLV-T>  00h     A9h     [1:0]  2'b0       OREG_TSTLVALPSEL
-     */
+	 * ---------------------------------------------------
+	 * <SLV-T>  00h     A9h     [1:0]  2'b0       OREG_TSTLVALPSEL
+	 */
 
 	/* Set SLV-T Bank : 0x00 */
 	if (cxd2878_wr(dev, dev->slvt, 0x00, 0x00) != 0) {
@@ -1153,16 +1151,16 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 		/* Serial TS, so set serial TS specific registers */
 
 		/* slave	Bank	Addr	Bit    default	  Name
-	  		 * -----------------------------------------------------
-	  		 * <SLV-T>	00h 	C4h 	[1:0]  2'b01	  OSERCKMODE
-	  		 */
+		 * -----------------------------------------------------
+		 * <SLV-T>	00h 	C4h 	[1:0]  2'b01	  OSERCKMODE
+		 */
 		cxd2878_SetRegisterBits(dev, dev->slvt, 0xC4,
 					tsClkConfiguration.serialClkMode, 0x03);
 
 		/* slave	Bank	Addr	Bit    default	  Name
-	  		 * -------------------------------------------------------
-	  		 * <SLV-T>	00h 	D1h 	[1:0]  2'b01	  OSERDUTYMODE
-	  		 */
+		 * -------------------------------------------------------
+		 * <SLV-T>	00h 	D1h 	[1:0]  2'b01	  OSERDUTYMODE
+		 */
 		cxd2878_SetRegisterBits(dev, dev->slvt, 0xD1,
 					tsClkConfiguration.serialDutyMode,
 					0x03);
@@ -1173,23 +1171,23 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 		goto err;
 	/* Disable TS IF Clock */
 	/* slave    Bank    Addr    Bit    default    Name
-     * -------------------------------------------------------
-     * <SLV-T>  00h     32h     [0]    1'b1       OREG_CK_TSTLVIF_EN
-     */
+	 * -------------------------------------------------------
+	 * <SLV-T>  00h     32h     [0]    1'b1       OREG_CK_TSTLVIF_EN
+	 */
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0x32, 0x00, 0x01);
 
 	/* slave    Bank    Addr    Bit    default    Name
-     * -------------------------------------------------------
-     * <SLV-T>  00h     33h     [1:0]  2'b01      OREG_CKSEL_TSTLVIF
-     */
-	cxd2878_SetRegisterBits(dev, dev->slvt, 0x33,
+	 * -------------------------------------------------------
+	 * <SLV-T>  00h     33h     [1:0]  2'b01      OREG_CKSEL_TSTLVIF
+	 */
+		cxd2878_SetRegisterBits(dev, dev->slvt, 0x33,
 				tsClkConfiguration.clkSelTSIf, 0x03);
 
 	/* Enable TS IF Clock */
 	/* slave    Bank    Addr    Bit    default    Name
-     * -------------------------------------------------------
-     * <SLV-T>  00h     32h     [0]    1'b1       OREG_CK_TSTLVIF_EN
-     */
+	 * -------------------------------------------------------
+	 * <SLV-T>  00h     32h     [0]    1'b1       OREG_CK_TSTLVIF_EN
+	 */
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0x32, 0x01, 0x01);
 	/* Set parity period enable / disable based on backwards compatible TS configuration.
          * These registers are set regardless of broadcasting system for simplicity.
@@ -1201,9 +1199,9 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 		goto err;
 
 	/* slave    Bank    Addr    Bit    default    Name
-         * ---------------------------------------------------------------
-         * <SLV-T>  10h     66h     [0]    1'b1       OREG_TSIF_PCK_LENGTH
-         */
+	 * ---------------------------------------------------------------
+	 * <SLV-T>  10h     66h     [0]    1'b1       OREG_TSIF_PCK_LENGTH
+	 */
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0x66, 0x01, 0x01);
 
 	/* Enable parity period for DVB-C (but affect to ISDB-C/J.83B) */
@@ -1213,9 +1211,9 @@ static int cxd2878_setTSClkModeAndFreq(struct cxd2878_dev *dev)
 		goto err;
 
 	/* slave    Bank    Addr    Bit    default    Name
-         * ---------------------------------------------------------------
-         * <SLV-T>  40h     66h     [0]    1'b1       OREG_TSIF_PCK_LENGTH
-         */
+	 * ---------------------------------------------------------------
+	 * <SLV-T>  40h     66h     [0]    1'b1       OREG_TSIF_PCK_LENGTH
+	 */
 	cxd2878_SetRegisterBits(dev, dev->slvt, 0x66, 0x01, 0x01);
 
 	return 0;
