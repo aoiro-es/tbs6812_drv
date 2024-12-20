@@ -738,6 +738,9 @@ static int cxd2857_tune(struct cxd2878_dev *dev, u32 frequencykHz)
 		break;
 
 	case SONY_DTV_SYSTEM_ISDBS:
+		tvSystem = SONY_FREIA_STV_ISDBS;
+		tuner_state = SONY_TUNER_STATE_S;
+		break;
 	case SONY_DTV_SYSTEM_ISDBS3:
 		tvSystem = SONY_FREIA_STV_ISDBS3;
 		tuner_state = SONY_TUNER_STATE_S;
