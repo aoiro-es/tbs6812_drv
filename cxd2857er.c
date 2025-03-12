@@ -1858,18 +1858,11 @@ static void cxd2878_set_tsid(struct dvb_frontend *fe, u32 stream_id)
 	cxd2878_wrm(dev, dev->slvt, 0xe9, data, 3);
 }
 
-static int cxd2878_set_isdbs3(struct dvb_frontend *fe);
-
-static int cxd2878_set_isdbs(struct dvb_frontend *fe)
+static int cxd2878_set_isdbs(struct dvb_frontend *fe, u16 stream_id)
 {
 	struct cxd2878_dev *dev = fe->demodulator_priv;
-	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+	fe->dtv_property_cache.symbol_rate = 28860000;
 	int ret = 0;
-
-	u16 network_id = (c->stream_id >> 12) & 0xf;
-	if (network_id == 0xb || network_id == 0xc) {
-		return cxd2878_set_isdbs3(fe);
-	}
 
 	if (dev->base->config.LED_switch)
 		dev->base->config.LED_switch(dev->base->i2c, 5);
@@ -1877,21 +1870,21 @@ static int cxd2878_set_isdbs(struct dvb_frontend *fe)
 	if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 	    (dev->system == SONY_DTV_SYSTEM_ISDBS)) {
 		/* Demodulator Active and set to ISDB-S mode */
-		cxd2878_set_tsid(fe, c->stream_id);
+		cxd2878_set_tsid(fe, stream_id);
 		cxd2878_wr(dev, dev->slvt, 0x00, 0x00);
 		cxd2878_wr(dev, dev->slvt, 0xc3, 0x01);
 	} else if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 		   (dev->system != SONY_DTV_SYSTEM_ISDBS)) {
 		/* Demodulator Active but not ISDB-S mode */
 		cxd2878_sleep(fe);
-		cxd2878_set_tsid(fe, c->stream_id);
+		cxd2878_set_tsid(fe, stream_id);
 		dev->system = SONY_DTV_SYSTEM_ISDBS;
 		SLtoAIS(dev);
 
 	} else if (dev->state == SONY_DEMOD_STATE_SLEEP) {
 		/* Demodulator in Sleep mode */
 		dev->system = SONY_DTV_SYSTEM_ISDBS;
-		cxd2878_set_tsid(fe, c->stream_id);
+		cxd2878_set_tsid(fe, stream_id);
 		SLtoAIS(dev);
 
 	} else {
@@ -1900,7 +1893,7 @@ static int cxd2878_set_isdbs(struct dvb_frontend *fe)
 
 	/* Update demodulator state */
 	dev->state = SONY_DEMOD_STATE_ACTIVE;
-	dev->symbol_rate = 28860000;
+	dev->symbol_rate = fe->dtv_property_cache.symbol_rate;
 
 	return 0;
 err:
@@ -1908,7 +1901,7 @@ err:
 	return ret;
 }
 
-static void cxd2878_set_stream_id(struct dvb_frontend *fe, u32 stream_id)
+static void cxd2878_set_stream_id(struct dvb_frontend *fe, u16 stream_id)
 {
 	struct cxd2878_dev *dev = fe->demodulator_priv;
 	cxd2878_wr(dev, dev->slvt, 0x00, 0xd0);
@@ -1916,20 +1909,131 @@ static void cxd2878_set_stream_id(struct dvb_frontend *fe, u32 stream_id)
 	cxd2878_wrm(dev, dev->slvt, 0x87, data, 2);
 }
 
-static int cxd2878_set_isdbs3(struct dvb_frontend *fe)
+static int cxd2878_wait_isdbs3_tmcc_lock(struct dvb_frontend* fe) {
+	int ret = 0;
+	struct cxd2878_dev *dev = fe->demodulator_priv;
+
+	if (dev->state != SONY_DEMOD_STATE_ACTIVE) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	for (int i = 0; i < 200; i++) {
+		u8 data3[3];
+		cxd2878_wr(dev, dev->slvt, 0x00, 0xa0);
+		cxd2878_rdm(dev, dev->slvt, 0x10, data3, 2);
+		u8 tmcclockstat = (u8)((data3[1] & 0x80) ? 1 : 0);
+		if (tmcclockstat) {
+			return ret;
+		}
+		msleep(10);
+	}
+	ret = -EINVAL;
+
+err:
+	dev_err(&dev->base->i2c->dev, "%s: wait isdbs3 tmcc lock error !", KBUILD_MODNAME);
+	return ret;
+}
+
+static int cxd2878_get_isdbs3_tmcc(struct dvb_frontend *fe, struct tmcc_stream_infos* tmcc) {
+	struct cxd2878_dev *dev = fe->demodulator_priv;
+	int ret = 0;
+
+	if (dev->state != SONY_DEMOD_STATE_ACTIVE) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	// freeze TMCC
+	ret = cxd2878_wr(dev, dev->slvt, 0x00, 0xd0);
+	ret |= cxd2878_wr(dev, dev->slvt, 0xfa, 0x01);
+	if (ret)
+		goto err;
+
+	// check TMCC read OK flag
+	u8 data;
+	ret = cxd2878_wr(dev, dev->slvt, 0x00, 0xd0);
+	ret |= cxd2878_rdm(dev, dev->slvt, 0xfb, &data, 1);
+	if (ret || (data & 0x01) != 1)
+		goto err_with_unfreezing;
+
+	// get TMCC
+	ret = cxd2878_wr(dev, dev->slvt, 0x00, 0xdb);
+	if (ret)
+		goto err_with_unfreezing;
+
+	u8 tmcc_data[240];
+	ret |= cxd2878_rdm(dev, dev->slvt, 0x10, tmcc_data, 240);
+	if (ret)
+		goto err_with_unfreezing;
+
+	int pos = 25;
+	for (int i=0; i < 16; i++) {
+		tmcc->stream_info[i].stream_type = tmcc_data[pos];
+		pos++;
+	}
+
+	ret = cxd2878_wr(dev, dev->slvt, 0x00, 0xdd);
+	if (ret)
+		goto err_with_unfreezing;
+	ret |= cxd2878_rdm(dev, dev->slvt, 0x10, tmcc_data, 240);
+	if (ret)
+		goto err_with_unfreezing;
+
+	pos = 213;
+	for (int i = 0; i < 13; i++) {
+		tmcc->stream_info[i].stream_id = (u16)((tmcc_data[pos] << 8) | tmcc_data[pos + 1]);
+		pos += 2;
+	}
+	tmcc->stream_info[13].stream_id = (u16)(tmcc_data[pos] << 8);
+
+	ret = cxd2878_wr(dev, dev->slvt, 0x00, 0xde);
+	if (ret)
+		goto err_with_unfreezing;
+	ret |= cxd2878_rdm(dev, dev->slvt, 0x10, tmcc_data, 6);
+	if (ret)
+		goto err_with_unfreezing;
+
+	pos = 0;
+	tmcc->stream_info[13].stream_id |= tmcc_data[pos];
+	pos++;
+	for (int i = 0; i < 2; i++) {
+		tmcc->stream_info[14 + i].stream_id = (u16)((tmcc_data[pos] << 8) | tmcc_data[pos + 1]);
+		pos += 2;
+	}
+
+	cxd2878_wr(dev, dev->slvt, 0x00, 0xd0);
+	cxd2878_wr(dev, dev->slvt, 0xfa, 0x00);
+
+	return ret;
+
+err_with_unfreezing:
+	cxd2878_wr(dev, dev->slvt, 0x00, 0xd0);
+	cxd2878_wr(dev, dev->slvt, 0xfa, 0x00);
+err:
+	dev_err(&dev->base->i2c->dev, "%s: get isdbs3 tmcc error !", KBUILD_MODNAME);
+	return ret;
+}
+
+static int cxd2878_set_isdbs3(struct dvb_frontend *fe, u16 stream_id)
 {
 	struct cxd2878_dev *dev = fe->demodulator_priv;
-	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+	fe->dtv_property_cache.symbol_rate = 33750000;
 	int ret = 0;
 
 	if (dev->base->config.LED_switch)
 		dev->base->config.LED_switch(dev->base->i2c, 5);
 
-	c->symbol_rate = 33750000;
+	if (stream_id < 16) {
+		// relative stream number
+		// get the stream id from TMCC after this function
+		stream_id = 0xffff;
+	}
+
 	if ((dev->state == SONY_DEMOD_STATE_ACTIVE) &&
 	    (dev->system == SONY_DTV_SYSTEM_ISDBS3)) {
 		/* Demodulator Active and set to ISDB-S3 mode */
-		cxd2878_set_stream_id(fe, c->stream_id);
+		cxd2878_set_stream_id(fe, stream_id);
 		u8 tlv_output = 1;
 		if (tlv_output) {
 			cxd2878_wr(dev, dev->slvt, 0x00, 0x01);
@@ -1942,14 +2046,14 @@ static int cxd2878_set_isdbs3(struct dvb_frontend *fe)
 		   (dev->system != SONY_DTV_SYSTEM_ISDBS3)) {
 		/* Demodulator Active but not ISDB-S3 mode */
 		cxd2878_sleep(fe);
-		cxd2878_set_stream_id(fe, c->stream_id);
+		cxd2878_set_stream_id(fe, stream_id);
 		dev->system = SONY_DTV_SYSTEM_ISDBS3;
 		SLtoAIS3(dev);
 
 	} else if (dev->state == SONY_DEMOD_STATE_SLEEP) {
 		/* Demodulator in Sleep mode */
 		dev->system = SONY_DTV_SYSTEM_ISDBS3;
-		cxd2878_set_stream_id(fe, c->stream_id);
+		cxd2878_set_stream_id(fe, stream_id);
 		SLtoAIS3(dev);
 
 	} else {
@@ -1958,7 +2062,7 @@ static int cxd2878_set_isdbs3(struct dvb_frontend *fe)
 
 	/* Update demodulator state */
 	dev->state = SONY_DEMOD_STATE_ACTIVE;
-	dev->symbol_rate = c->symbol_rate;
+	dev->symbol_rate = fe->dtv_property_cache.symbol_rate;
 
 	return 0;
 err:
@@ -2247,8 +2351,6 @@ err:
 	return ret;
 }
 
-static int cxd2878_set_isdbs(struct dvb_frontend *fe);
-
 static int cxd2878_set_frontend(struct dvb_frontend *fe)
 {
 	struct cxd2878_dev *dev = fe->demodulator_priv;
@@ -2271,12 +2373,32 @@ static int cxd2878_set_frontend(struct dvb_frontend *fe)
 	if (dev->base->config.TS_switch)
 		dev->base->config.TS_switch(dev->base->i2c, 1);
 
+	u16 tsid = (u16)c->stream_id;
+	u16 tsid_mode = c->stream_id >> 16;
+
 	switch (c->delivery_system) {
 	case SYS_ISDBT:
 		ret = cxd2878_set_isdbt(fe);
 		break;
 	case SYS_ISDBS:
-		ret = cxd2878_set_isdbs(fe);
+		switch (tsid_mode) {
+		case 0x0001:
+			// ISDB-S
+			ret = cxd2878_set_isdbs(fe, tsid);
+			break;
+		case 0x0003:
+			// ISDB-S3
+			ret = cxd2878_set_isdbs3(fe, tsid);
+			break;
+		default:
+			u16 network_id = (tsid >> 12) & 0xf;
+			if (network_id == 0xb || network_id == 0xc) {
+				ret = cxd2878_set_isdbs3(fe, tsid);
+			} else {
+				ret = cxd2878_set_isdbs(fe, tsid);
+			}
+			break;
+		}
 		break;
 	default:
 		goto err;
@@ -2292,6 +2414,25 @@ static int cxd2878_set_frontend(struct dvb_frontend *fe)
 
 	if (ret)
 		goto err;
+
+	// if the stream id is less than 16, it is a relative ISDB-S3 stream number
+	// get the stream id from TMCC
+	if (c->delivery_system == SYS_ISDBS && tsid_mode == 0x0003 && tsid < 16) {
+		struct tmcc_stream_infos tmcc;
+		ret |= cxd2878_wait_isdbs3_tmcc_lock(fe);
+		ret |= cxd2878_get_isdbs3_tmcc(fe, &tmcc);
+
+#ifdef DEBUG
+		for (int i = 0; i < 16; i++) {
+			dev_dbg(&dev->base->i2c->dev, "tmcc(%d): stream_id=%d stream_type=%d\n", i, tmcc.stream_info[i].stream_id, tmcc.stream_info[i].stream_type);
+		}
+#endif
+
+		if (ret)
+			goto err;
+
+		cxd2878_set_stream_id(fe, tmcc.stream_info[tsid].stream_id);
+	}
 
 	mutex_unlock(&dev->base->i2c_lock);
 

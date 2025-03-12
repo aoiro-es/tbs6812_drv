@@ -42,6 +42,15 @@ struct cxd2857_config {
 	void (*LED_switch)(struct i2c_adapter *i2c, u8 flag); //5590
 };
 
+struct stream_info {
+    u16 stream_id;
+    u32 stream_type;
+};
+
+struct tmcc_stream_infos {
+    struct stream_info stream_info[16];
+};
+
 #define CONFIG_DVB_CXD2878_MODULE
 #define CONFIG_DVB_CXD2878
 #if 1
